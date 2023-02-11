@@ -1,11 +1,11 @@
 package com.example.verticalcardview
 
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager2.widget.ViewPager2
 import androidx.viewpager2.widget.ViewPager2.ORIENTATION_VERTICAL
-import kotlin.math.abs
-import kotlin.math.max
+import java.lang.Math.abs
 
 class MainActivity : AppCompatActivity() {
     lateinit var verticalViewPager : ViewPager2
@@ -22,45 +22,59 @@ class MainActivity : AppCompatActivity() {
 
     private fun createVerticalView(data : ArrayList<Int>){
         verticalViewPager.orientation = ORIENTATION_VERTICAL
-        verticalViewPager.adapter = VerticalViewPagerAdapter(data)
+        val adapter = VerticalViewPagerAdapter(data)
+        verticalViewPager.adapter = adapter
 
         with(verticalViewPager){
             clipToPadding = false
             clipChildren = false
             offscreenPageLimit = 1
         }
+        verticalViewPager.setPageTransformer(SwipeTransformer())
+    }
 
-        // 애니메이션 추가
-        val MIN_SCALE = 0.85f
-        val MIN_ALPHA = 0.5f
-        val pageMarginPy = resources.getDimensionPixelOffset(R.dimen.pageMargin)
-        val offsetPy = resources.getDimensionPixelOffset(R.dimen.offset)
+    inner class SwipeTransformer : ViewPager2.PageTransformer{
 
-        verticalViewPager.setPageTransformer { page, position ->
+        private val screenHeight = resources.displayMetrics.heightPixels //폰의 높이를 가져옴
+        private val pageMarginPy = resources.getDimensionPixelOffset(R.dimen.pageMargin)
+        private val offsetPy = resources.getDimensionPixelOffset(R.dimen.offset)
+        private val pageHeight = screenHeight - pageMarginPy - offsetPy
+
+        private val MIN_SCALE = 0.75f
+        private val MIN_ALPHA = 0.5f
+        override fun transformPage(page: View, position: Float) {
+            val scaleFactor = MIN_SCALE + (1 - MIN_SCALE) * (1 - abs(position))
+
             page.apply {
-               when{
-                    position < -1 -> {
-                        alpha = 0f
-                    }
-                    position <=1 ->{
-                        val scaleFactor = max(MIN_SCALE, 1 - abs(position))
+                if (position < -1) { // [-Infinity,-1)
+                    scaleX = scaleFactor
+                    scaleY = scaleFactor
+                    alpha = 0f
+                } else if (position <= 0) { // [-1,0]
+                    translationY = pageHeight * -position
 
-                        val viewPager = page.parent.parent as ViewPager2
-                        val offset = position * -(2 * offsetPy+pageMarginPy)
-                        if(viewPager.orientation == ORIENTATION_VERTICAL){
-                            page.translationY = offset
-                        }else{
-                            page.translationX = offset
-                        }
+                    scaleX = scaleFactor
+                    scaleY = scaleFactor
+                    alpha =
+                        (MIN_ALPHA + (((scaleFactor - MIN_SCALE) / (1 - MIN_SCALE)) * (1 - MIN_ALPHA)))
+                } else if (position <= 1) { // (0,1]
+                    alpha = 1f
+                    scaleX = 1f
+                    scaleY = scaleFactor
 
-                        scaleX = 1f
-                        scaleY = scaleFactor
-                        alpha = (MIN_ALPHA +
-                                (((scaleFactor - MIN_SCALE) / (1 - MIN_SCALE)) * (1 - MIN_ALPHA)))
+                    val viewPager = page.parent.parent as ViewPager2
+                    val offset = position * -(2 * offsetPy + pageMarginPy)
+
+                    if (viewPager.orientation == ORIENTATION_VERTICAL) {
+                        page.translationY = offset
+                    } else {
+                        page.translationX = offset
                     }
-                    else -> {
-                        alpha = 0f
-                    }
+
+                } else { // (1,+Infinity]
+                    alpha = 0f
+                    scaleX = MIN_SCALE + (1 - MIN_SCALE) * (1 - abs(position))
+                    scaleY = 1f
                 }
             }
         }
